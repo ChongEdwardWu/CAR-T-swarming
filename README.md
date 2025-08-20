@@ -13,7 +13,6 @@ This repo hosts lightly annotated, de-personalized R scripts to reproduce the si
 - **Inputs:** 10x Genomics `filtered_feature_bc_matrix` directories per sample.  
 - **Outputs:** RDS objects, PNG/PDF figures, and XLSX tables are written under `R/results/` and `R/figures/`.
 
-Where to set paths: In R/QC/scRNA_QC_loop_step1.R (base directory for Cell Ranger outputs). Subsequent scripts read RDS files produced by prior steps and write to R/results and R/figures.
 ---
 
 
