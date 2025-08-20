@@ -1,6 +1,5 @@
 #!/usr/bin/env Rscript
 # CAR T scRNA-seq — Step 2: Clustering, marker discovery, and annotation
-# Minimal edits: de-personalized paths, light comments, date-less outputs by default.
 
 # ------------------------- Setup & parameters ------------------------------
 suppressPackageStartupMessages({
