@@ -1,11 +1,17 @@
 # CAR‑T‑swarming
+Code for the single-cell RNA-seq analyses used in the manuscript “Activation-gated, self-reinforcing CCL5–CCR5 relay drives CAR T cell swarming and immune remodeling in solid tumors”.
 
+This repository contains R scripts to perform quality control, doublet detection, SCTransform v2 normalization, multi-sample integration, clustering, marker discovery, differential expression, gene signature scoring (UCell), and figure generation for two scRNA-seq datasets
+
+- intratumoral human CAR T cells (tNGFR+)
+- intratumoral human non-CAR leukocytes (hCD45+ tNGFR−)
+
+---
 **Manuscript title**  
-**Self‑Amplifying CCL5–CCR5 Circuit Drives CAR T Swarming and Tumor Immunity Normalization**
+**Activation-gated, self-reinforcing CCL5–CCR5 relay drives CAR T cell swarming and immune remodeling in solid tumors**
 
 **Abstract**  
-Poor trafficking and limited persistence hinder chimeric antigen receptor T cell (CAR-T) therapy in solid tumors. Here we convert CAR-T from solitary effectors into cooperative swarms by hard-wiring a stimulus-gated CCL5–CCR5 circuit. Because CAR/T-cell-receptor engagement rapidly releases pre-formed CCL5 yet represses its transcription, constitutive CCL5 co-expression restored a burst-on-demand chemokine pulse upon antigen engagement with minimal leakage. CCL5-armored CAR-T markedly increased peer recruitment, streamed from tumor-spheroid rims to tumor cores, and achieved remarkable infiltration in orthotopic tumor exografts in a CCL5-CCR5-dependent manner. Swarming boosted IFN-γ production while reducing PD-1/TIM-3 co-expression in CAR-T, recruited endogenous CCR5⁺ lymphoid cytotoxic effectors, and re-programmed suppressive myeloid populations toward MHC-II–rich phenotypes, collectively normalizing the tumor microenvironment and culminating in durable tumor control. Therefore, embedding a CCL5–CCR5 feedback loop rewires CAR-T into self-organizing swarms and highlights programmable chemokine circuits as plug-and-play tools for coordinated trafficking and durable immune normalization in solid-tumor immunotherapy.
-
+Limited trafficking and dysfunction constrain CAR T cell therapy in solid tumors. Here, we developed an activation-gated, self-reinforcing strategy for tumor-localized CAR T cell swarming. CCR5 was enriched on CD8+ CAR T cells and CCL5 was poised for activation-coupled release, yet ex vivo activation and expansion depleted preformed CCL5 stores and reduced CCL5 transcripts in CAR T products. Constitutive CCL5 expression restored CAR-gated chemokine pulses with minimal basal secretion. Recruited CCR5+ CAR T cells amplified these pulses upon antigen encounter, establishing a self-reinforcing relay that promoted CAR T cell swarming into collagen-embedded tumor spheroids, orthotopic hepatocellular carcinoma, and subcutaneous tumors. In xenografts, swarming CAR T cells retained anti-tumor activity and, with PBMC co-infusion, recruited bystander lymphocytes; in immunocompetent hosts without lymphodepletion, they remodeled the tumor immune microenvironment, improved antigen-positive tumor control, and restrained contralateral antigen-negative lesions. Activation-gated chemokine relays thus offer a modular strategy to coordinate engineered and host immunity against solid tumors.
 
 ---
 
@@ -62,7 +68,32 @@ CAR-T-swarming/
                  │
       └─ 05_hepaLSK_final.r              (final figures & UCell trends)**
 ```
+---
 
+## Input data
+
+This repository does not include raw sequencing data.
+
+The scripts expect Cell Ranger `count` outputs for each sample, and specifically use the `filtered_feature_bc_matrix/` directory produced by Cell Ranger (10x Genomics 3′ v3 chemistry in the manuscript). Please refer to the manuscript for the experimental design, cell sorting strategy, and sequencing details.
+
+---
+
+## Software requirements
+
+The analysis was developed and tested in a recent R 4.x environment. Key packages include, but are not limited to
+
+- `Seurat` and `SeuratObject`
+- `SingleCellExperiment`, `scater`, `scran`
+- `scDblFinder`
+- `sctransform`
+- `UCell`, `Nebulosa`
+- `ggplot2`, `patchwork`, `cowplot`
+- `dplyr`, `tibble`, `stringr`, `tidyr`
+- `openxlsx`
+
+Please refer to the `library()` calls at the top of each script for the full set of dependencies.
+
+---
 
 ## Citation
 
