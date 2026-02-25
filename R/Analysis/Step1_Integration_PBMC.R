@@ -107,8 +107,8 @@ for (cn in meta_cols) {
 ct <- clustree(seu@meta.data, prefix = "integrated_snn_res.", return = "plot")
 ggsave(file.path(FIG_DIR, "PBMC_Step1_clustree.png"), ct, width = 180, height = 140, units = "mm", dpi = 150)
 
-# Choose resolution for downstream work (default 1.0)
-Idents(seu) <- seu$seurat_clusters <- factor(seu@meta.data[[paste0("integrated_snn_res.", RES_CHOSEN)]])
+# Choose resolution for downstream work
+Idents(seu) <- seu$seurat_clusters <- factor(seu@meta.data[[paste0("integrated_snn_res.", "0.2")]])
 
 # UMAP split by group at chosen resolution
 umap_split <- try({
