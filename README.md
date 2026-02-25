@@ -1,10 +1,11 @@
 # CAR‑T‑swarming
-Code for the single-cell RNA-seq analyses used in the manuscript “Activation-gated, self-reinforcing CCL5–CCR5 relay drives CAR T cell swarming and immune remodeling in solid tumors”.
+This repository contains R scripts used to process and analyze the single-cell RNA-seq datasets associated with the manuscript:
+> *Activation-gated, self-reinforcing CCL5–CCR5 relay drives CAR T cell swarming and immune remodeling in solid tumors*
 
-This repository contains R scripts to perform quality control, doublet detection, SCTransform v2 normalization, multi-sample integration, clustering, marker discovery, differential expression, gene signature scoring (UCell), and figure generation for two scRNA-seq datasets
+The scripts contain R codes to perform quality control, doublet detection, SCTransform v2 normalization, multi-sample integration, clustering, marker discovery, differential expression, gene signature scoring (UCell), and figure generation for two scRNA-seq datasets:
 
-- intratumoral human CAR T cells (tNGFR+)
-- intratumoral human non-CAR leukocytes (hCD45+ tNGFR−)
+1. **CAR T dataset** (intratumoral **tNGFR⁺** CAR T cells; samples `PostCAR` and `PostCC5`).
+2. **PBMC co-infusion dataset** (intratumoral **tNGFR⁻** human leukocytes; samples `PBMC_CAR` and `PBMC_CC5`).
 
 ---
 **Manuscript title**  
