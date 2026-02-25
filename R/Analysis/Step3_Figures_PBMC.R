@@ -364,6 +364,230 @@ p_dot_NK <- DotPlot(seu_NKsig, group.by = "group", assay = "SCT", features = uni
 ggsave(file.path(FIG_DIR_PBMC, "fig7_signature_dotplot_PBMC_NK.png"), p_dot_NK, width = 150, height = 100, units = "mm", dpi = 300)
 ggsave(file.path(FIG_DIR_PBMC, "fig7_signature_dotplot_PBMC_NK.pdf"), p_dot_NK, width = 150, height = 100, units = "mm", device = "pdf", bg = "transparent")
 
+# ----------------- Differential expression, enrichment & volcano plots -----------------
+# This section reproduces Supplemental Fig. S4G and exports DEG/GO/GSEA results.
+# Comparison is PBMC_CC5 (CAR.CCL5 + PBMC) vs PBMC_CAR (CAR.con + PBMC) within each CellType_l1.
+
+# Output paths
+DEG_XLSX <- Sys.getenv("DEG_XLSX", unset = file.path(RES_DIR, "Step3_CellType_DEG_GO_GSEA_results.xlsx"))
+VOLCANO_DIR <- Sys.getenv("VOLCANO_DIR", unset = file.path(FIG_DIR_PBMC, "nonCAR_volcano"))
+dir.create(VOLCANO_DIR, showWarnings = FALSE, recursive = TRUE)
+
+# Parameters
+DEG_IDENT1 <- Sys.getenv("DEG_IDENT1", unset = "PBMC_CC5")  # numerator
+DEG_IDENT2 <- Sys.getenv("DEG_IDENT2", unset = "PBMC_CAR")  # denominator
+MIN_CELLS_PER_GROUP <- as.numeric(Sys.getenv("MIN_CELLS_PER_GROUP", unset = "25"))
+MIN_CELLS_PER_CELLTYPE <- as.numeric(Sys.getenv("MIN_CELLS_PER_CELLTYPE", unset = "100"))
+P_ADJ_CUTOFF <- as.numeric(Sys.getenv("P_ADJ_CUTOFF", unset = "0.05"))
+LOGFC_THRESH <- as.numeric(Sys.getenv("LOGFC_THRESH", unset = "0.05"))
+N_TOP_LABEL <- as.integer(Sys.getenv("N_TOP_LABEL", unset = "10"))
+
+# Confounder feature blacklist (can be extended via an optional RDS file)
+BAD_FEATURES <- c(
+  grep("^MT-", rownames(seu), value = TRUE),
+  grep("^RPL", rownames(seu), value = TRUE),
+  grep("^RPS", rownames(seu), value = TRUE),
+  grep("^TR[ABDG][VDJC]", rownames(seu), value = TRUE),
+  grep("^IG[HKL][VDJC]", rownames(seu), value = TRUE),
+  grep("^HLA-", rownames(seu), value = TRUE),
+  grep("^HIST", rownames(seu), value = TRUE),
+  "MKI67", "TOP2A", "PCNA", "BIRC5", "STMN1", "TYMS", "HMGB2", "TUBA1B",
+  "HBB", "HBA1", "HBA2"
+)
+BLACKLIST_RDS <- Sys.getenv("BLACKLIST_RDS", unset = "")
+if (nzchar(BLACKLIST_RDS) && file.exists(BLACKLIST_RDS)) {
+  message("Loading additional blacklist features from: ", BLACKLIST_RDS)
+  extra_blacklist <- readRDS(BLACKLIST_RDS)
+  BAD_FEATURES <- unique(c(BAD_FEATURES, extra_blacklist))
+}
+BAD_FEATURES <- unique(BAD_FEATURES)
+
+# Run DE within each CellType_l1 subset
+DefaultAssay(seu) <- "SCT"
+Idents(seu) <- "CellType_l1"
+
+celltypes_l1 <- levels(factor(seu$CellType_l1))
+degs_list <- list()
+go_up_list <- list()
+go_dn_list <- list()
+gsea_list <- list()
+
+# MSigDB collections for GSEA
+msig_collections <- c("H", "C2", "C5")
+
+for (ct in celltypes_l1) {
+  message("DEG: processing CellType_l1 = ", ct)
+  sub <- subset(seu, idents = ct)
+
+  if (ncol(sub) < MIN_CELLS_PER_CELLTYPE) {
+    message("  -> skipped (", ncol(sub), " cells < MIN_CELLS_PER_CELLTYPE)")
+    next
+  }
+
+  # Require both groups
+  grp_tab <- table(sub$group)
+  if (!(DEG_IDENT1 %in% names(grp_tab) && DEG_IDENT2 %in% names(grp_tab))) {
+    message("  -> skipped (missing one of the groups: ", DEG_IDENT1, ", ", DEG_IDENT2, ")")
+    next
+  }
+  if (any(grp_tab[c(DEG_IDENT1, DEG_IDENT2)] < MIN_CELLS_PER_GROUP)) {
+    message("  -> skipped (insufficient cells per group: ", paste(names(grp_tab), grp_tab, collapse = ", "), ")")
+    next
+  }
+
+  # Re-run SCT within subset for DE (mirrors raw analysis)
+  DefaultAssay(sub) <- "RNA"
+  if ("SCT" %in% Assays(sub)) sub[["SCT"]] <- NULL
+  sub <- NormalizeData(sub, verbose = FALSE)
+  sub <- FindVariableFeatures(sub, selection.method = "vst", nfeatures = 3000, verbose = FALSE)
+  sub <- SCTransform(sub, vst.flavor = "v2", variable.features.n = 3000, verbose = FALSE)
+  DefaultAssay(sub) <- "SCT"
+  sub <- PrepSCTFindMarkers(sub)
+
+  feats <- setdiff(rownames(sub), BAD_FEATURES)
+
+  deg <- FindMarkers(
+    sub,
+    group.by = "group",
+    ident.1 = DEG_IDENT1,
+    ident.2 = DEG_IDENT2,
+    features = feats,
+    test.use = "wilcox",
+    min.pct = 0.10,
+    logfc.threshold = LOGFC_THRESH,
+    verbose = FALSE
+  ) %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column("symbol")
+
+  degs_list[[ct]] <- deg
+
+  # GO enrichment (BP) for up/down genes
+  universe <- feats
+  up_genes <- deg %>% filter(p_val_adj < P_ADJ_CUTOFF, avg_log2FC > 0.25) %>% pull(symbol)
+  dn_genes <- deg %>% filter(p_val_adj < P_ADJ_CUTOFF, avg_log2FC < -0.25) %>% pull(symbol)
+
+  if (length(up_genes) > 5) {
+    go_up <- enrichGO(
+      gene = up_genes,
+      universe = universe,
+      OrgDb = org.Hs.eg.db,
+      keyType = "SYMBOL",
+      ont = "BP",
+      pAdjustMethod = "BH",
+      qvalueCutoff = 0.05,
+      readable = TRUE
+    ) %>% as.data.frame()
+    go_up_list[[ct]] <- go_up
+  }
+
+  if (length(dn_genes) > 5) {
+    go_dn <- enrichGO(
+      gene = dn_genes,
+      universe = universe,
+      OrgDb = org.Hs.eg.db,
+      keyType = "SYMBOL",
+      ont = "BP",
+      pAdjustMethod = "BH",
+      qvalueCutoff = 0.05,
+      readable = TRUE
+    ) %>% as.data.frame()
+    go_dn_list[[ct]] <- go_dn
+  }
+
+  # GSEA with MSigDB collections
+  ranks <- deg$avg_log2FC
+  names(ranks) <- deg$symbol
+  ranks <- sort(ranks, decreasing = TRUE)
+  ranks <- ranks[!is.na(ranks)]
+
+  gsea_list[[ct]] <- list()
+  for (coll in msig_collections) {
+    msig_df <- msigdbr(species = "Homo sapiens", category = coll)
+    pathways <- split(msig_df$gene_symbol, msig_df$gs_name)
+
+    fg <- fgsea(
+      pathways = pathways,
+      stats = ranks,
+      minSize = 10,
+      maxSize = 500,
+      nperm = 1000
+    ) %>%
+      as.data.frame() %>%
+      arrange(padj)
+
+    gsea_list[[ct]][[coll]] <- fg
+  }
+}
+
+# Export DEG/GO/GSEA workbook
+wb_deg <- wb_workbook()
+
+for (ct in names(degs_list)) {
+  # DEG
+  sheet_deg <- paste0("DEG_", ct)
+  wb_add_worksheet(wb_deg, sheet_deg)
+  wb_add_data(wb_deg, sheet_deg, degs_list[[ct]])
+
+  # GO UP/DN
+  if (!is.null(go_up_list[[ct]])) {
+    sheet_go_up <- paste0("GO_UP_", ct)
+    wb_add_worksheet(wb_deg, sheet_go_up)
+    wb_add_data(wb_deg, sheet_go_up, go_up_list[[ct]])
+  }
+  if (!is.null(go_dn_list[[ct]])) {
+    sheet_go_dn <- paste0("GO_DN_", ct)
+    wb_add_worksheet(wb_deg, sheet_go_dn)
+    wb_add_data(wb_deg, sheet_go_dn, go_dn_list[[ct]])
+  }
+
+  # GSEA collections
+  if (!is.null(gsea_list[[ct]])) {
+    for (coll in names(gsea_list[[ct]])) {
+      sheet_gsea <- paste0("GSEA_", coll, "_", ct)
+      wb_add_worksheet(wb_deg, sheet_gsea)
+      wb_add_data(wb_deg, sheet_gsea, gsea_list[[ct]][[coll]])
+    }
+  }
+}
+
+wb_save(wb_deg, file = DEG_XLSX, overwrite = TRUE)
+message("DEG/GO/GSEA workbook written: ", DEG_XLSX)
+
+# Volcano plots for major lymphoid subsets
+volcano_celltypes <- c("CD8T", "CD4T", "NK")
+for (ct in volcano_celltypes) {
+  deg <- degs_list[[ct]]
+  if (is.null(deg)) {
+    message("Volcano: missing DEG table for ", ct, "; skipping.")
+    next
+  }
+
+  top_genes <- deg %>%
+    filter(p_val_adj < 1e-6, abs(avg_log2FC) > 0.5) %>%
+    arrange(desc(abs(avg_log2FC))) %>%
+    head(N_TOP_LABEL) %>%
+    pull(symbol)
+
+  p <- EnhancedVolcano(
+    deg,
+    lab = deg$symbol,
+    x = "avg_log2FC",
+    y = "p_val_adj",
+    pCutoff = P_ADJ_CUTOFF,
+    FCcutoff = 0.25,
+    pointSize = 2.0,
+    labSize = 4.0,
+    selectLab = top_genes,
+    title = paste0(ct, ": ", DEG_IDENT1, " vs ", DEG_IDENT2),
+    subtitle = NULL,
+    caption = NULL
+  )
+
+  ggsave(file.path(VOLCANO_DIR, paste0("Volcano_", ct, ".png")), p, width = 6, height = 6, dpi = 300)
+  ggsave(file.path(VOLCANO_DIR, paste0("Volcano_", ct, ".pdf")), p, width = 6, height = 6)
+}
+
 # ------------------------- Save object & session info ---------------------
 fig_rds <- if (INCLUDE_DATE_IN_NAMES) sprintf("03_Figures_PBMC_%s.rds", format(Sys.Date(), "%Y%m%d")) else "03_Figures_PBMC.rds"
 saveRDS(seu, file = file.path(RES_DIR, fig_rds))
