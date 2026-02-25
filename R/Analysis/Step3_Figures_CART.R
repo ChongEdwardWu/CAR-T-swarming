@@ -165,7 +165,7 @@ sig_list <- list(
   NaiveMemory   = c("SELL","CCR7","IL7R","FOXO1","TCF7"),
   Polyfunction  = c("GZMB","IFNG","FASLG","TNF","CCL1","CCL3","CCL4","CXCL11"),
   Proliferation = c("MKI67","PCNA","TOP2A","BIRC5","MCM5"),
-  Exhaustion    = c("TOX","TOX2","NR4A2","NR4A3","PDCD1","TIGIT","LAG3","HAVCR2")
+  Exhaustion    = c("TOX","TOX2","PDCD1","CTLA4","TIGIT","LAG3","EOMES")
 )
 
 # Score (UCell). Columns appended as *_UCell
